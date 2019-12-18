@@ -1,7 +1,8 @@
+#!/usr/bin/env julia
 
 PI = 4.0*atan(1.0)
-Int :: indices(:,:)
-Int :: minusplus(:,:)
+# Int :: indices(:,:)
+# Int :: minusplus(:,:)
 
 function total_energy_ising_2d(spins_lattice, jey1, jey2, magnetic_field)::Float64
     # INTEGER, DIMENSION(:,:), INTENT(IN) :: SPINS_LATTICE
@@ -20,7 +21,7 @@ function total_energy_ising_2d(spins_lattice, jey1, jey2, magnetic_field)::Float
         xi .= [i1, i2]    #NEAREST NEIGHBOR PART
         for m1 = 1:2, m2 = 1:1
             co .= xi
-            co[m1] = minusplus[xi[M1], M2]
+            co[m1] = minusplus[xi[m1], m2]
             energy_nn = energy_nn + spins_lattice[i1, i2] * spins_lattice[co[1], co[2]]
         end
 
@@ -35,177 +36,128 @@ function total_energy_ising_2d(spins_lattice, jey1, jey2, magnetic_field)::Float
     total_energy_ising_2d = jey1 * energy_nn + jey2 * energy_nnn
     total_s = sum(spins_lattice)
     total_energy_ising_2d = total_energy_ising_2d - magnetic_field * total_s
-    return
+    return total_energy_ising_2d
 end # function total_energy_ising_2d
 
-SUBROUTINE CALCULATE_AVERAGE_SSSQ(SPINS,TOTAL_S,TOTAL_SSQ)
-    USE MYTYPE, ONLY : INDICES
-    IMPLICIT NONE
-    INTEGER, DIMENSION(:,:), INTENT(IN) :: SPINS
-    REAL(8), INTENT(OUT) :: TOTAL_S,TOTAL_SSQ
+function calculate_average_sssq(spins)
+    # INTEGER, DIMENSION(:,:), INTENT(IN) :: SPINS
+    # REAL(8), INTENT(OUT) :: TOTAL_S,TOTAL_SSQ
 
-    TOTAL_S = SUM(SPINS(:,:))
-    TOTAL_SSQ = TOTAL_S**2
+    total_s = sum(spins[:, :])
+    total_ssq = total_s * total_s
+    return [total_s, total_ssq]
+end # end subroutine calculate_average_sssq
 
-    RETURN
-  END SUBROUTINE CALCULATE_AVERAGE_SSSQ
+function create_indices(lsize)
+    # INTEGER, INTENT(IN) :: LSIZE
 
-  SUBROUTINE CREATE_INDICES(LSIZE)
-    USE MYTYPE, ONLY :INDICES
-    IMPLICIT NONE
-    INTEGER, INTENT(IN) :: LSIZE
-    INTEGER :: I1,I2
+    indices = zeros(Int64, (lsize,lsize))
+    for i1 = 1:lsize, i2 = 1:lsize
+        indices[i1, i2] = lsize * (i1 - 1) + i2
+    end
+    return indices
+end # END SUBROUTINE CREATE_INDICES
 
-    ALLOCATE(INDICES(LSIZE,LSIZE))
 
-    FORALL (I1 = 1:LSIZE,I2 = 1:LSIZE)
-       INDICES(I1,I2) = LSIZE * (I1 - 1) + I2
-    END FORALL
-    RETURN
-  END SUBROUTINE CREATE_INDICES
-
-### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ###
-  SUBROUTINE GENERATE_RANDOM_SPIN(SPINCONF)
-    USE MYTYPE
-    IMPLICIT NONE
-    INTEGER, INTENT(OUT) :: SPINCONF
-    REAL(8) :: TEMP
-    CALL RANDOM_NUMBER(TEMP)
-    IF (TEMP >= 0.5D0)THEN
-       SPINCONF = 1
-    ELSE
-       SPINCONF = -1
-    END IF
-    RETURN
-  END SUBROUTINE GENERATE_RANDOM_SPIN
+function generate_random_spin()
+    # INTEGER, INTENT(OUT) :: SPINCONF
+    temp = rand()
+    if temp >= 0.50
+        spinconf = 1
+    else
+        spinconf = -1
+    end
+    return spinconf
+end # SUBROUTINE GENERATE_RANDOM_SPIN
 
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ###
 ### TAKE THE SPIN CONFIGURATION AND CALCULATE SI.SJ      ###
-  SUBROUTINE CALCULATE_SI_SJ(SPINS,SI_SJ)
-    USE MYTYPE, ONLY : INDICES
-    IMPLICIT NONE
-    INTEGER, DIMENSION(:,:), INTENT(IN) :: SPINS
-    INTEGER, DIMENSION(:,:), INTENT(OUT) :: SI_SJ
-    INTEGER :: I1,I2,J1,J2,LSIZE
+function calculate_si_sj(spins)
+    # INTEGER, DIMENSION(:,:), INTENT(IN) :: SPINS
+    # INTEGER, DIMENSION(:,:), INTENT(OUT) :: SI_SJ
 
-    LSIZE = SIZE(SPINS,DIM = 1)
-
-    SI_SJ = 0
+    lsize = size(spins, 1)
+    nsize = lsize * lsize
+    si_sj = zeros((nsize, nsize))
 
     #ALL THE SITES HAVE NON ZERO SPINS
-    DO I1 = 1, LSIZE
-       DO I2 = 1, LSIZE
+    for i1 = 1:lsize, i2 = 1:lsize
+        ii = indices[i1, i2]
+        for j1 = 1:lsize, j2 = 1:lsize
+            jj = indices[j1, j2]
+            if ii < jj
+                continue
+            end
+            si_sj[ii, jj] = spins[i1, i2] * spins[j1, j2]
+            si_sj[jj, ii] = si_sj[ii, jj]
+        end
+    end
+    return si_sj
+end # SUBROUTINE CALCULATE_SI_SJ
 
-          DO J1 = 1, LSIZE
-             DO J2 = 1, LSIZE
-                IF( INDICES(I1,I2) < INDICES(J1,J2)) CYCLE
-                SI_SJ(INDICES(I1,I2),INDICES(J1,J2)) = SPINS(I1,I2) * SPINS(J1,J2)
-                SI_SJ(INDICES(J1,J2),INDICES(I1,I2)) = SI_SJ(INDICES(I1,I2),INDICES(J1,J2))
-             END DO
-          END DO
+function selected_sq_from_si_sj(si_sj, que, lsize)
+    # INTEGER, DIMENSION(:,:), INTENT(IN) :: SI_SJ
+    # INTEGER, DIMENSION(:), INTENT(IN) :: QUE
+    # INTEGER, INTENT(IN) :: LSIZE
+    # REAL(8), INTENT(OUT) :: STRUCTURE_FACTOR
 
-       END DO
-    END DO
+    nsize = lsize * lsize
+    coeff = 2.0 * PI/ lsize
+    normalize = nsize^2
 
-  END SUBROUTINE CALCULATE_SI_SJ
+    tmpdp = 0.0
+    for i = 1:nsize
+        tmpdp += si_sj[i, i]
+    end
+    # tmpdp = sum(diag(si_sj, 0))
+        
+    structure_factor = tmpdp
 
-  SUBROUTINE SELECTED_SQ_FROM_SI_SJ(SI_SJ,QUE,LSIZE,STRUCTURE_FACTOR)
-
-    USE MYTYPE, ONLY: PI,INDICES
-    IMPLICIT NONE
-    INTEGER, DIMENSION(:,:), INTENT(IN) :: SI_SJ
-    INTEGER, DIMENSION(:), INTENT(IN) :: QUE
-    INTEGER, INTENT(IN) :: LSIZE
-    REAL(8), INTENT(OUT) :: STRUCTURE_FACTOR
-
-    REAL(8) :: TMPDP,COEFF
-    INTEGER :: Q(2),RIJ(2),NORMALIZE
-    INTEGER :: I1,I2,J1,J2,ITMP
-
-    COEFF = 2.0D0 * PI/DBLE(LSIZE)
-    NORMALIZE = LSIZE**4
-    TMPDP = 0.0D0
-    DO ITMP = 1,LSIZE**2
-       TMPDP = TMPDP + DBLE(SI_SJ(ITMP,ITMP))
-    END DO
-    STRUCTURE_FACTOR = TMPDP
-
-    Q = QUE
-    DO I1 = 1,LSIZE
-       DO J1 = 1,LSIZE
-          RIJ(1) = I1 - J1
-          DO I2 = 1,LSIZE
-             DO J2 = 1,LSIZE
-                RIJ(2) = I2 - J2
-                IF(INDICES(J1,J2) >= INDICES(I1,I2))CYCLE
-                ITMP = DOT_PRODUCT(Q,RIJ)
-                TMPDP = COEFF * DBLE(ITMP)
-                TMPDP = DBLE(SI_SJ(INDICES(I1,I2),INDICES(J1,J2))) * 2.0D0 * COS(TMPDP)
-                STRUCTURE_FACTOR = STRUCTURE_FACTOR + TMPDP
-             END DO
-          END DO
-       END DO
-    END DO
-
-    STRUCTURE_FACTOR = STRUCTURE_FACTOR / DBLE(NORMALIZE)
-    RETURN
-
-  END SUBROUTINE SELECTED_SQ_FROM_SI_SJ
+    rij = zeros(Int, 2)
+    q = que
+    for i1 = 1:lsize, j1 = 1:lsize
+        RIJ[1] = i1 - j1
+        for i2 = 1:lsize, j2 = 1:lsize
+            rij[2] = i2 - j2
+            ii, jj = indices[i1, i2], indices[j1, j2]
+            if jj >= ii
+                continue
+            end
+            itmp = dot(q, rij)
+            tmpdp = coeff * itmp
+            tmpdp = si_sj[ii, jj] * 2.0 * cos(tmpdp)
+            structure_factor += tmpdp
+        end
+    end
+    structure_factor = structure_factor / normalize
+    return structure_factor
+end # SUBROUTINE SELECTED_SQ_FROM_SI_SJ
 
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ###
 ### GIVEN SI.SJ FOR THE SPIN CONFIGURATION, CALCULATE    ###
 ### THE STRUCTURE FACTOR S(Q) FROM THIS                  ###
-  SUBROUTINE STRUCTURE_FACTOR_FROM_SI_SJ(SI_SJ,STRUCTURE_FACTOR)
+function structure_factor_from_si_sj(si_sj, lsize)
+    # INTEGER, DIMENSION(:,:), INTENT(IN) :: SI_SJ
+    # REAL(8), DIMENSION(:,:), INTENT(OUT) :: STRUCTURE_FACTOR
 
-    USE MYTYPE, ONLY: PI,INDICES
-    IMPLICIT NONE
-    INTEGER, DIMENSION(:,:), INTENT(IN) :: SI_SJ
-    REAL(8), DIMENSION(:,:), INTENT(OUT) :: STRUCTURE_FACTOR
+    structure_factor = zeros(lsize, lsize)
+    que = zeros(Int, 2)
+    
+    # LOOP Q1
+    for q1 = 1:lsize
+        que[1] = q1 - 1
+        # LOOP Q2
+        for q2 = 1:lsize
+            que[2] = q2 - 1
+            #
+            structure_factor[q1, q2] = selected_sq_from_si_sj(si_sj, que, lsize)
+            #
+        end # DO LOOP_Q2
+    end # DO LOOP_Q1
 
-    REAL(8) :: TMPDP,COEFF
-    INTEGER :: LSIZE
-    INTEGER :: Q1,Q2,Q(2),RIJ(2),NORMALIZE
-    INTEGER :: I1,I2,J1,J2,ITMP
+    return structure_factor
 
-    LSIZE = SIZE(STRUCTURE_FACTOR,DIM = 1)
-    COEFF = 2.0D0 * PI/DBLE(LSIZE)
-
-    NORMALIZE = LSIZE**4
-
-    TMPDP = 0.0D0
-    DO ITMP = 1,LSIZE**2
-       TMPDP = TMPDP + DBLE(SI_SJ(ITMP,ITMP))
-    END DO
-    STRUCTURE_FACTOR = TMPDP
-
-    LOOP_Q1:DO Q1 = 1,LSIZE
-       Q(1) = Q1 - 1
-       LOOP_Q2:DO Q2 = 1,LSIZE
-          Q(2) = Q2 - 1
-
-          DO I1 = 1,LSIZE
-             DO J1 = 1,LSIZE
-                RIJ(1) = I1 - J1
-                DO I2 = 1,LSIZE
-                   DO J2 = 1,LSIZE
-                      RIJ(2) = I2 - J2
-                      IF(INDICES(J1,J2) >= INDICES(I1,I2))CYCLE
-                      ITMP = DOT_PRODUCT(Q,RIJ)
-                      TMPDP = COEFF * DBLE(ITMP)
-                      TMPDP = DBLE(SI_SJ(INDICES(I1,I2),INDICES(J1,J2))) * 2.0D0 * COS(TMPDP)
-                      STRUCTURE_FACTOR(Q1,Q2) = STRUCTURE_FACTOR(Q1,Q2) + TMPDP
-                   END DO
-                END DO
-             END DO
-          END DO
-
-       END DO LOOP_Q2
-    END DO LOOP_Q1
-
-    STRUCTURE_FACTOR = STRUCTURE_FACTOR / DBLE(NORMALIZE)
-    RETURN
-
-  END SUBROUTINE STRUCTURE_FACTOR_FROM_SI_SJ
+end # SUBROUTINE STRUCTURE_FACTOR_FROM_SI_SJ
 
 # PROGRAM COOL_ISING_SPINS_3D
 
@@ -213,8 +165,8 @@ SUBROUTINE CALCULATE_AVERAGE_SSSQ(SPINS,TOTAL_S,TOTAL_SSQ)
 
 #   IMPLICIT NONE
 
-#   INTEGER, PARAMETER :: LSIZE = 20
-#   INTEGER, PARAMETER :: NSIZE = LSIZE**2
+const lsize = 20
+const nsize = lsize * lsize
 
 #   REAL(8) :: JEY1,JEY2
 #   INTEGER, ALLOCATABLE, DIMENSION(:,:) :: SI_SJ,AVG_SISJ
@@ -260,31 +212,34 @@ SUBROUTINE CALCULATE_AVERAGE_SSSQ(SPINS,TOTAL_S,TOTAL_SSQ)
 #   UNIT_TMP  = 111
 
 #   #DEFINE THE TIME OF SWEEP AND NUMBER OF STEPS TO EQUILIBRIATE.
-#   MAXMCSWEEP = 10000#0
-#   NEQUIL = 5000#0
-#   NDEL = 20
-#   NUMBER_OF_TEMPERATURE = 60
+maxmcsweep = 10000 #0
+nequil = 5000 #0
+NDEL = 20
+number_of_temperature = 60
 
 #   #======READ THE INPUT VARIABLES FIRSTLY FROM ARGUMENT
 #   #IF THAT NOT GIVEN THEN FROM STANDARD INPUT=======#
-#   JEY1 = -1.0D0
+jey1 = -1.0
+jey2 =  0.0
 #   PRINT*,"ENTER JEY2,MAX TEMPERATURE"
 #   READ(*,*)JEY2,MAX_TEMPERATURE #JEY2 = 0.5D0
 
-#   MAGNETIC_FIELD = 0.0D0
-#   #MAX_TEMPERATURE = 3.0D0 * ABS(JEY1)
-#   DELTA_T = MAX_TEMPERATURE / DBLE(NUMBER_OF_TEMPERATURE - 1)
+magnetic_field = 0.0
+max_temperature = 3.0 * abs(jey1)
+delta_t = max_temperature / (number_of_temperature - 1)
 
-#   ALLOCATE(SI_SJ(NSIZE,NSIZE),AVG_SISJ(NSIZE,NSIZE))
-#   ALLOCATE(SF_ISING(0:LSIZE-1,0:LSIZE-1))
-#   ALLOCATE(SPINS_LATTICE(LSIZE,LSIZE))
+si_sj = zeros(nsize, nsize)
+avg_sisj = zeros(nsize, nsize)
+sf_heisen = zeros(lsize, lsize) #   ALLOCATE(SF_ISING(0:LSIZE-1,0:LSIZE-1))
+
+spins_lattice = zeros(lsize, lsize)
+
+
 #   ALLOCATE(MINUSPLUS(LSIZE,2),ONETON(LSIZE))
 
-#   CALL CREATE_INDICES(LSIZE)
+indices = create_indices(lsize)
 
-#   FORALL(I = 1:LSIZE)ONETON(I) = I
-#   MINUSPLUS(:,1) = CSHIFT(ONETON,-1)
-#   MINUSPLUS(:,2) = CSHIFT(ONETON,1)
+minusplus = [circshift(Vector(1:lsize), 1) circshift(Vector(1:lsize), -1)]
 
 #   OPEN(UNIT_TMP, FILE = 'ising_2d.inp')
 #   WRITE(UNIT_TMP,'("JEY1            = ",F15.5)')JEY1
@@ -311,15 +266,13 @@ SUBROUTINE CALCULATE_AVERAGE_SSSQ(SPINS,TOTAL_S,TOTAL_SSQ)
 #   WRITE(*,'("DELTA T         = ",F15.5)')DELTA_T
 #   WRITE(*,'("MAGNETIC FIELD  = ",3(F15.5,1X))')MAGNETIC_FIELD
 
-#   #GENERATE THE SNAPSHOT OF SPINS (RANDOM CONFIGURATION)#
+#GENERATE THE SNAPSHOT OF SPINS (RANDOM CONFIGURATION)#
 #   OPEN(UNIT_TMP,FILE = 'starting_spins.dat')
-#   DO I1 = 1,LSIZE
-#      DO I2 = 1,LSIZE
-#         #SPINS_LATTICE(I1,I2) = 1
-#         CALL GENERATE_RANDOM_SPIN(SPINS_LATTICE(I1,I2))
-#         WRITE(UNIT_TMP,"(3(I2,1X))")I1,I2,SPINS_LATTICE(I1,I2)
-#      END DO
-#   END DO
+for i1 = 1:lsize, i2 = 1:lsize
+    #SPINS_LATTICE(I1,I2) = 1
+    spins_lattice[i1, i2] = generate_random_spin()
+    # WRITE(UNIT_TMP,"(3(I2,1X))")I1,I2,SPINS_LATTICE(I1,I2)
+end
 #   CLOSE(UNIT_TMP)
 
 #   #=====================================#
@@ -336,8 +289,15 @@ SUBROUTINE CALCULATE_AVERAGE_SSSQ(SPINS,TOTAL_S,TOTAL_SSQ)
 #        &'CHAI','S','SSQ'
 #   #======================================#
 
-#   TOTAL_ENERGY = TOTAL_ENERGY_ISING_2D(SPINS_LATTICE,JEY1,JEY2,MAGNETIC_FIELD)
-#   PRINT'("TOTAL ENERGY IN STARTING = ",F20.10)',TOTAL_ENERGY/NSIZE
+total_energy = total_energy_ising_2d(spins_lattice, jey1,jey2, magnetic_field)
+println("TOTAL ENERGY IN STARTING = ", total_energy / nsize)
+
+
+
+
+
+
+
 #   PRINT"('STARTING THE T LOOP')"
 
 #   TOTAL_S = SUM(SPINS_LATTICE(:,:))
