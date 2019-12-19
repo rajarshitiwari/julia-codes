@@ -213,9 +213,9 @@ const nsize = lsize * lsize
 #   UNIT_TMP  = 111
 
 #   #DEFINE THE TIME OF SWEEP AND NUMBER OF STEPS TO EQUILIBRIATE.
-maxmcsweep = 10000 #0
-nequil = 5000 #0
-ndel = 20
+maxmcsweep = 1000 #0
+nequil = 500 #0
+ndel = 1
 number_of_temperature = 60
 
 #   #======READ THE INPUT VARIABLES FIRSTLY FROM ARGUMENT
@@ -231,7 +231,7 @@ delta_t = max_temperature / (number_of_temperature - 1)
 
 si_sj = zeros(nsize, nsize)
 avg_sisj = zeros(nsize, nsize)
-sf_heisen = zeros(lsize, lsize) #   ALLOCATE(SF_ISING(0:LSIZE-1,0:LSIZE-1))
+sf_ising = zeros(lsize, lsize) #   ALLOCATE(SF_ISING(0:LSIZE-1,0:LSIZE-1))
 
 spins_lattice = zeros(Int, (lsize, lsize))
 
@@ -268,13 +268,19 @@ minusplus = [circshift(Vector(1:lsize), 1) circshift(Vector(1:lsize), -1)]
 #   WRITE(*,'("MAGNETIC FIELD  = ",3(F15.5,1X))')MAGNETIC_FIELD
 
 #GENERATE THE SNAPSHOT OF SPINS (RANDOM CONFIGURATION)#
-#   OPEN(UNIT_TMP,FILE = 'starting_spins.dat')
+
 for i1 = 1:lsize, i2 = 1:lsize
     #SPINS_LATTICE(I1,I2) = 1
     spins_lattice[i1, i2] = generate_random_spin()
-    # WRITE(UNIT_TMP,"(3(I2,1X))")I1,I2,SPINS_LATTICE(I1,I2)
 end
-#   CLOSE(UNIT_TMP)
+unit_tmp = open("starting_spins.dat", "w")
+for i1 = 1:lsize
+    for i2 = 1:lsize
+        print(unit_tmp, string(spins_lattice[i1, i2], " "))
+    end
+    print(unit_tmp,"\n")
+end
+close(unit_tmp)
 
 #   #=====================================#
 #   #=======OPEN THE FILES TO WRITE=======#
@@ -415,11 +421,11 @@ while temperature > 0.0         # temperature_loop
     # write(*,'(3x,"time taken =",f12.2," seconds")',advance='no')(time2-time1)
     
     # call cpu_time(tsf1)        #tsf1 = x05baf()
-    sf_ising = structure_factor_from_si_sj(avg_sisj, lsize)
+    # @time sf_ising = structure_factor_from_si_sj(avg_sisj, lsize)
     # call cpu_time(tsf2)        #tsf2 = x05baf()
     max_sq = maximum(sf_ising)
     # write(*,'(3x,"time for s(q) =",1x,f12.2,1x,"seconds. maximum s(q) =",1x,f20.10)')tsf2-tsf1,max_sq
-    println(count_temp, temperature)
+    println("count = ", count_temp, " Temperature = ", temperature)
     c_v = (avgesq - (avge)^2) / nsize
     c_v = c_v / (temperature^2)
     avge = avge / nsize
