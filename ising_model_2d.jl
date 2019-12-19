@@ -1,5 +1,6 @@
 #!/usr/bin/env julia
 
+using LinearAlgebra
 PI = 4.0*atan(1.0)
 # Int :: indices(:,:)
 # Int :: minusplus(:,:)
@@ -116,7 +117,7 @@ function selected_sq_from_si_sj(si_sj, que, lsize)
     rij = zeros(Int, 2)
     q = que
     for i1 = 1:lsize, j1 = 1:lsize
-        RIJ[1] = i1 - j1
+        rij[1] = i1 - j1
         for i2 = 1:lsize, j2 = 1:lsize
             rij[2] = i2 - j2
             ii, jj = indices[i1, i2], indices[j1, j2]
@@ -214,7 +215,7 @@ const nsize = lsize * lsize
 #   #DEFINE THE TIME OF SWEEP AND NUMBER OF STEPS TO EQUILIBRIATE.
 maxmcsweep = 10000 #0
 nequil = 5000 #0
-NDEL = 20
+ndel = 20
 number_of_temperature = 60
 
 #   #======READ THE INPUT VARIABLES FIRSTLY FROM ARGUMENT
@@ -232,7 +233,7 @@ si_sj = zeros(nsize, nsize)
 avg_sisj = zeros(nsize, nsize)
 sf_heisen = zeros(lsize, lsize) #   ALLOCATE(SF_ISING(0:LSIZE-1,0:LSIZE-1))
 
-spins_lattice = zeros(lsize, lsize)
+spins_lattice = zeros(Int, (lsize, lsize))
 
 
 #   ALLOCATE(MINUSPLUS(LSIZE,2),ONETON(LSIZE))
@@ -289,183 +290,170 @@ end
 #        &'CHAI','S','SSQ'
 #   #======================================#
 
-total_energy = total_energy_ising_2d(spins_lattice, jey1,jey2, magnetic_field)
+total_energy = total_energy_ising_2d(spins_lattice, jey1, jey2, magnetic_field)
 println("TOTAL ENERGY IN STARTING = ", total_energy / nsize)
 
+# println(spins_lattice)
+println("STARTING THE T LOOP")
 
+total_s = sum(spins_lattice)
 
+previous_energy = total_energy
 
+temperature = max_temperature
+println(temperature)
+count_temp = 0
 
-
-
-#   PRINT"('STARTING THE T LOOP')"
-
-#   TOTAL_S = SUM(SPINS_LATTICE(:,:))
-
-#   PREVIOUS_ENERGY = TOTAL_ENERGY
-#   TEMPERATURE = MAX_TEMPERATURE
-#   COUNT_TEMP = 0
-
-#   TEMPERATURE_LOOP : DO WHILE(TEMPERATURE > 0.0D0)
-
-#      MCSWEEP = 1
-#      COUNT = 0
-#      OLDCOUNT = 0
-#      OUTCOUNT = 0
-#      AVG_SISJ = 0.0D0
-#      AVGE = 0.0D0
-#      AVGESQ = 0.0D0
-#      MAGNETIZATION = 0.0D0
-#      SQAF = 0.0D0
-#      AVERAGE_S = 0.0D0
-#      AVERAGE_SSQ = 0.0D0
-#      CHAI = 0.0D0
-#      IMC = 0
-#      IFAIL = 0
-#      IPASS = 0
-#      CALL CPU_TIME(TIME1) #TIME1 = X05BAF()
-#      MC_LOOP : DO WHILE(MCSWEEP <= MAXMCSWEEP)
-
-#         SWEEP_I1 : DO I1 = 1, LSIZE
-#            SWEEP_I2 : DO I2 = 1, LSIZE
-
-#               TMP_SPIN = - SPINS_LATTICE(I1,I2) #FLIP THE TEMP SPIN
-
-#               #@######################################
-#               #@ CALCULATE THE ENERGY DIFFERENCE NOW #
-#               #@######################################
-
-#               ENERGY_DIFFERENCE = 0.0D0
-#               XI = [I1,I2] #NEAREST NEIGHBOR PART
-#               DO M1 = 1,2
-#                  DO M2 = 1,2
-#                     CO = XI
-#                     CO(M1) = MINUSPLUS(XI(M1),M2)
-#                     ENERGY_DIFFERENCE = ENERGY_DIFFERENCE + 2.0D0 * JEY1 * DBLE(TMP_SPIN * SPINS_LATTICE(CO(1),CO(2)))
-#                  END DO
-#               END DO
-
-#               XI = [I1,I2]
-#               DO M1 = 1,2
-#                  DO M2 = 1,2
-#                     CO(1) = MINUSPLUS(I1,M1)
-#                     CO(2) = MINUSPLUS(I2,M2)
-#                     ENERGY_DIFFERENCE = ENERGY_DIFFERENCE + 2.0D0 * JEY2 * DBLE(TMP_SPIN * SPINS_LATTICE(CO(1),CO(2)))
-#                  END DO
-#               END DO
-
-#               PREVIOUS_S = SPINS_LATTICE(I1,I2)
-#               CURRENT_S = TMP_SPIN
-
-#               ENERGY_DIFFERENCE = ENERGY_DIFFERENCE - MAGNETIC_FIELD*CURRENT_S + MAGNETIC_FIELD*PREVIOUS_S
-
-#               IF(ENERGY_DIFFERENCE < 0.0D0)THEN
-#                  SPINS_LATTICE(I1,I2) = TMP_SPIN #UPDATE THE TEMP SPIN
-#                  FINAL_ENERGY = PREVIOUS_ENERGY + ENERGY_DIFFERENCE
-#                  IPASS = IPASS + 1
-#               ELSE
-#                  #CALL RAN3(METRO_POLICE)
-#                  CALL RANDOM_NUMBER(METRO_POLICE)
-#                  COMPARE = ENERGY_DIFFERENCE
-#                  COMPARE = COMPARE/(TEMPERATURE + 1.0E-10_8)
-#                  COMPARE = EXP(-COMPARE)
-#                  IF(METRO_POLICE < COMPARE)THEN
-#                     SPINS_LATTICE(I1,I2) = TMP_SPIN #UPDATE THE TEMP SPIN
-#                     FINAL_ENERGY = PREVIOUS_ENERGY + ENERGY_DIFFERENCE
-#                     IPASS = IPASS + 1
-#                  ELSE
-#                     FINAL_ENERGY = PREVIOUS_ENERGY
-#                     IFAIL = IFAIL + 1
-#                  END IF
-#               END IF
-#               IMC = IMC + 1
-#            END DO SWEEP_I2
-#         END DO SWEEP_I1
+while temperature > 0.0         # temperature_loop
+    #    
+    mcsweep = 1
+    count = 0
+    oldcount = 0
+    outcount = 0
+    avg_sisj .= 0.0
+    avge = 0.0
+    avgesq = 0.0
+    magnetization = 0.0
+    sqaf = 0.0
+    average_s = 0.0
+    average_ssq = 0.0
+    chai = 0.0
+    imc = 0
+    ifail = 0
+    ipass = 0
+    # CALL CPU_TIME(TIME1) #TIME1 = X05BAF()
+    # MC_LOOP
+    while mcsweep <= maxmcsweep
+        #
+        # SWEEP_I1, SWEEP_I2
+        for i1 = 1:lsize, i2 = 1:lsize
+            tmp_spin = - spins_lattice[i1, i2] # FLIP THE TEMP SPIN
+            
+            ########################################
+            # CALCULATE THE ENERGY DIFFERENCE NOW  #
+            ########################################
         
-#         IF(MCSWEEP > NEQUIL)THEN
-#            COUNT = COUNT + 1
-#            TAKING_AVG :IF(COUNT - OLDCOUNT == NDEL)THEN
-#               OUTCOUNT = OUTCOUNT + 1
-              
-#               CALL CALCULATE_SI_SJ(SPINS_LATTICE,SI_SJ)
-#               CALL CALCULATE_AVERAGE_SSSQ(SPINS_LATTICE,TOTAL_S,S_SQUARE)
-#               #TOTAL_S = SUM(SPINS_LATTICE(:,:))
-#               #S_SQUARE = TOTAL_S**2
-              
-#               TOTAL_ENERGY = TOTAL_ENERGY_ISING_2D(SPINS_LATTICE,JEY1,JEY2,MAGNETIC_FIELD)
+            energy_difference = 0.0
+            xi = [i1,i2] #nearest neighbor part
+            for m1 = 1:2, m2 = 1:2
+                co = xi
+                co[m1] = minusplus[xi[m1], m2]
+                energy_difference += 2.0 * jey1 * tmp_spin * spins_lattice[co[1], co[2]]
+            end
+            xi = [i1,i2]
+            for m1 = 1:2, m2 = 1:2
+                co = [minusplus[i1, m1], minusplus[i2, m2]]
+                energy_difference += 2.0 * jey2 * tmp_spin * spins_lattice[co[1], co[2]]
+            end
+            
+            previous_s = spins_lattice[i1, i2]
+            current_s = tmp_spin
+            
+            energy_difference += -magnetic_field * current_s + magnetic_field * previous_s
+            
+            if energy_difference < 0.0
+                spins_lattice[i1, i2] = tmp_spin # update the temp spin
+                final_energy = previous_energy + energy_difference
+                ipass = ipass + 1
+            else
+                metro_police = rand()
+                compare = energy_difference
+                compare = compare / (temperature + 1.0e-10)
+                compare = exp(-compare)
+                
+                if metro_police < compare
+                    spins_lattice[i1, i2] = tmp_spin # update the temp spin
+                    final_energy = previous_energy + energy_difference
+                    ipass += 1
+                else
+                    final_energy = previous_energy
+                    ifail += 1
+                end
+            end
+                
+            imc += 1
+        end                     # sweep_i1, sweep_i2
+        
+    
+        if mcsweep > nequil
+            count += 1
+            # taking_avg
+            if count - oldcount == ndel
+                outcount += 1
 
-#               AVERAGE_S = AVERAGE_S + TOTAL_S
-#               AVERAGE_SSQ = AVERAGE_SSQ + S_SQUARE
-#               AVG_SISJ = AVG_SISJ + SI_SJ
-#               AVGESQ = AVGESQ + TOTAL_ENERGY**2
-#               AVGE = AVGE + TOTAL_ENERGY
+                si_sj .= calculate_si_sj(spins_lattice)
+                total_s, s_square = calculate_average_sssq(spins_lattice)
+                # total_s = sum(spins_lattice(:,:))
+                # s_square = total_s**2
+                #
+                total_energy = total_energy_ising_2d(spins_lattice, jey1, jey2, magnetic_field)
+                #
+                average_s += total_s
+                average_ssq += s_square
+                avg_sisj .+= si_sj
+                avgesq += total_energy^2
+                avge += total_energy
+                #
+                oldcount = count
+            end # taking_avg
+        end
+        mcsweep += 1
+    end                         # mc_loop
+    
+    divide = outcount * 1.0
+    avg_sisj .= avg_sisj / divide
+    avge = avge / divide
+    avgesq = avgesq / divide
+    average_s = average_s / divide
+    average_ssq = average_ssq / divide
+    # write(unit_acc,'(3(f15.10,1x))')temperature,dble(ipass)/dble(imc),dble(ifail)/dble(imc)
+    
+    # ###########################################################
+    # ###########################################################
+    # call cpu_time(time2) #time2 = x05baf()#
+    # write(*,"(a,2x,f15.10)",advance='no')'running program at t =',temperature
+    # write(*,'(3x,"time taken =",f12.2," seconds")',advance='no')(time2-time1)
+    
+    # call cpu_time(tsf1)        #tsf1 = x05baf()
+    sf_ising = structure_factor_from_si_sj(avg_sisj, lsize)
+    # call cpu_time(tsf2)        #tsf2 = x05baf()
+    max_sq = maximum(sf_ising)
+    # write(*,'(3x,"time for s(q) =",1x,f12.2,1x,"seconds. maximum s(q) =",1x,f20.10)')tsf2-tsf1,max_sq
+    println(count_temp, temperature)
+    c_v = (avgesq - (avge)^2) / nsize
+    c_v = c_v / (temperature^2)
+    avge = avge / nsize
+    
+    chai = average_ssq / nsize - average_s^2 / nsize
+    chai = chai / temperature
+    sqaf = sf_ising[Int(lsize/2), Int(lsize/2)]
+    magnetization = sf_ising[1, 1]
+    #
+    # write(unit_es,'(2(f20.10,1x),e20.10)')temperature,avge,c_v
+    # write(unit_mx,'(6(f20.10,1x))')temperature,magnetization,sqaf,chai,average_s/dble(nsize),average_ssq/dble(nsize)
+    # write(unit_sp,*)'t=',temperature
+    for i1 = 1:lsize, i2 = 1:lsize
+        # write(unit_sp,'(3(i2,1x))')i1,i2,spins_lattice(i1,i2)
+        qstr = string(i1 - 1, "_", i2 - 1)
+        # write(unit_sisj,'(3(i2,1x))')i1,i2,avg_sisj(1,indices(i1,i2))
+        # write(unit_sq,'(a9,1x,1(f20.10,1x),e20.10)')qstr,temperature,sf_ising(i1-1,i2-1)
+    end
+    # write(unit_sp,*)
+    # write(unit_sq,*)
+    global temperature += -delta_t
+    global count_temp += 1
+end # do temperature_loop
 
-#               OLDCOUNT = COUNT
-#            END IF TAKING_AVG
-#         END IF
 
-#         MCSWEEP = MCSWEEP + 1
-#      END DO MC_LOOP
 
-#      DIVIDE = DBLE(OUTCOUNT)
-#      AVG_SISJ = AVG_SISJ/DIVIDE
-#      AVGE = AVGE/DIVIDE
-#      AVGESQ = AVGESQ/DIVIDE
-#      AVERAGE_S = AVERAGE_S/DIVIDE
-#      AVERAGE_SSQ = AVERAGE_SSQ/DIVIDE
 
-#      WRITE(UNIT_ACC,'(3(F15.10,1X))')TEMPERATURE,DBLE(IPASS)/DBLE(IMC),DBLE(IFAIL)/DBLE(IMC)
-     
-# ###########################################################
-# ###########################################################
-#      CALL CPU_TIME(TIME2) #TIME2 = X05BAF()#
-#      WRITE(*,"(A,2X,F15.10)",ADVANCE='NO')'RUNNING PROGRAM AT T =',TEMPERATURE
-#      WRITE(*,'(3X,"TIME TAKEN =",F12.2," SECONDS")',ADVANCE='NO')(TIME2-TIME1)
-
-#      CALL CPU_TIME(TSF1)        #TSF1 = X05BAF()
-#      CALL STRUCTURE_FACTOR_FROM_SI_SJ(AVG_SISJ,SF_ISING)
-#      CALL CPU_TIME(TSF2)        #TSF2 = X05BAF()
-#      MAX_SQ = MAXVAL(SF_ISING)
-#      WRITE(*,'(3X,"TIME FOR S(Q) =",1X,F12.2,1X,"SECONDS. MAXIMUM S(Q) =",1X,F20.10)')TSF2-TSF1,MAX_SQ
-
-#      C_V = (AVGESQ - (AVGE)**2)/DBLE(NSIZE)
-#      C_V = C_V / (TEMPERATURE**2)
-#      AVGE = AVGE/NSIZE
-
-#      CHAI = AVERAGE_SSQ/DBLE(NSIZE) - (AVERAGE_S)**2 /DBLE(NSIZE)
-#      CHAI = CHAI / TEMPERATURE
-#      SQAF = SF_ISING(LSIZE/2,LSIZE/2)
-#      MAGNETIZATION = SF_ISING(0,0)
-
-#      WRITE(UNIT_ES,'(2(F20.10,1X),E20.10)')TEMPERATURE,AVGE,C_V
-#      WRITE(UNIT_MX,'(6(F20.10,1X))')TEMPERATURE,MAGNETIZATION,SQAF,CHAI,AVERAGE_S/DBLE(NSIZE),AVERAGE_SSQ/DBLE(NSIZE)
-
-#      WRITE(UNIT_SP,*)'T=',TEMPERATURE
-#      DO I1 = 1, LSIZE
-#         DO I2 = 1, LSIZE
-#            WRITE(UNIT_SP,'(3(I2,1X))')I1,I2,SPINS_LATTICE(I1,I2)
-#            CALL NUMTOSTR(I1-1,QSTR1)
-#            CALL NUMTOSTR(I2-1,QSTR2)
-#            TMPSAVE = TRIM(QSTR1)//'_'//TRIM(QSTR2)
-#            WRITE(UNIT_SISJ,'(3(I2,1X))')I1,I2,AVG_SISJ(1,INDICES(I1,I2))
-#            WRITE(UNIT_SQ,'(A9,1X,1(F20.10,1X),E20.10)')TMPSAVE,TEMPERATURE,SF_ISING(I1-1,I2-1)
-#         END DO
-#      END DO
-#      WRITE(UNIT_SP,*)
-#      WRITE(UNIT_SQ,*)
-
-#      TEMPERATURE = TEMPERATURE - DELTA_T
-#      COUNT_TEMP = COUNT_TEMP + 1
-
-#   END DO TEMPERATURE_LOOP
-
-#   CLOSE(UNIT_ES)
-#   CLOSE(UNIT_MX)
-#   CLOSE(UNIT_SP)
-#   CLOSE(UNIT_SQ)
-#   CLOSE(UNIT_SISJ)
-#   CLOSE(UNIT_EPS)
-#   CLOSE(UNIT_TMP)
+# CLOSE(UNIT_ES)
+# CLOSE(UNIT_MX)
+# CLOSE(UNIT_SP)
+# CLOSE(UNIT_SQ)
+# CLOSE(UNIT_SISJ)
+# CLOSE(UNIT_EPS)
+# CLOSE(UNIT_TMP)
 
 #   OPEN(101,FILE = 'spin_gs.dat')
 #   OPEN(102,FILE = 'sisj_gs.dat')
