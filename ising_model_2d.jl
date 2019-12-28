@@ -1,11 +1,28 @@
 #!/usr/bin/env julia
 
 using LinearAlgebra
-PI = 4.0*atan(1.0)
+const PI = 4.0*atan(1.0)
 # Int :: indices(:,:)
 # Int :: minusplus(:,:)
 
-function total_energy_ising_2d(spins_lattice, jey1, jey2, magnetic_field)::Float64
+
+function metro_polis(de, temp)::Bool
+    flag = false
+    if de < 0.0
+        flag = true
+                else
+        metro_police = rand()
+        compare = exp(-de/(temp + 1.0e-10))
+        if metro_police < compare
+            flag = true
+        else
+            flag = false
+        end
+    end
+    return flag
+end
+
+function total_energy_ising_2d(spins_lattice::Array{Int64}, jey1::Float64, jey2::Float64, magnetic_field::Float64)::Float64
     # INTEGER, DIMENSION(:,:), INTENT(IN) :: SPINS_LATTICE
     # REAL(8), INTENT(IN) :: JEY1,JEY2
     # REAL(8), INTENT(IN) :: MAGNETIC_FIELD
@@ -73,7 +90,7 @@ end # SUBROUTINE GENERATE_RANDOM_SPIN
 
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ###
 ### TAKE THE SPIN CONFIGURATION AND CALCULATE SI.SJ      ###
-function calculate_si_sj(spins)
+function calculate_si_sj(spins::Array{Int})::Array{Float64}
     # INTEGER, DIMENSION(:,:), INTENT(IN) :: SPINS
     # INTEGER, DIMENSION(:,:), INTENT(OUT) :: SI_SJ
 
@@ -86,11 +103,11 @@ function calculate_si_sj(spins)
         ii = indices[i1, i2]
         for j1 = 1:lsize, j2 = 1:lsize
             jj = indices[j1, j2]
-            if ii < jj
-                continue
-            end
+            #if ii < jj
+            #    continue
+            #end
             si_sj[ii, jj] = spins[i1, i2] * spins[j1, j2]
-            si_sj[jj, ii] = si_sj[ii, jj]
+            #si_sj[jj, ii] = si_sj[ii, jj]
         end
     end
     return si_sj
@@ -213,34 +230,34 @@ const nsize = lsize * lsize
 #   UNIT_TMP  = 111
 
 #   #DEFINE THE TIME OF SWEEP AND NUMBER OF STEPS TO EQUILIBRIATE.
-maxmcsweep = 1000 #0
-nequil = 500 #0
-ndel = 1
-number_of_temperature = 60
+
+global maxmcsweep = 1000 #0
+global nequil = 500 #0
+global ndel = 1
+global number_of_temperature = 60
 
 #   #======READ THE INPUT VARIABLES FIRSTLY FROM ARGUMENT
 #   #IF THAT NOT GIVEN THEN FROM STANDARD INPUT=======#
-jey1 = -1.0
-jey2 =  0.0
+global jey1 = -1.0
+global jey2 =  0.0
 #   PRINT*,"ENTER JEY2,MAX TEMPERATURE"
 #   READ(*,*)JEY2,MAX_TEMPERATURE #JEY2 = 0.5D0
 
-magnetic_field = 0.0
-max_temperature = 3.0 * abs(jey1)
-delta_t = max_temperature / (number_of_temperature - 1)
+global magnetic_field = 0.0
+global max_temperature = 3.0 * abs(jey1)
+global delta_t = max_temperature / (number_of_temperature - 1)
 
 si_sj = zeros(nsize, nsize)
-avg_sisj = zeros(nsize, nsize)
-sf_ising = zeros(lsize, lsize) #   ALLOCATE(SF_ISING(0:LSIZE-1,0:LSIZE-1))
+global sf_ising = zeros(lsize, lsize) #   ALLOCATE(SF_ISING(0:LSIZE-1,0:LSIZE-1))
 
-spins_lattice = zeros(Int, (lsize, lsize))
+global spins_lattice = zeros(Int, (lsize, lsize))
 
 
 #   ALLOCATE(MINUSPLUS(LSIZE,2),ONETON(LSIZE))
 
-indices = create_indices(lsize)
+global indices = create_indices(lsize)
 
-minusplus = [circshift(Vector(1:lsize), 1) circshift(Vector(1:lsize), -1)]
+global minusplus = [circshift(Vector(1:lsize), 1) circshift(Vector(1:lsize), -1)]
 
 #   OPEN(UNIT_TMP, FILE = 'ising_2d.inp')
 #   WRITE(UNIT_TMP,'("JEY1            = ",F15.5)')JEY1
@@ -310,26 +327,27 @@ temperature = max_temperature
 println(temperature)
 count_temp = 0
 
-while temperature > 0.0         # temperature_loop
-    #    
-    mcsweep = 1
+while temperature::Float64 > 0.0         # temperature_loop
+    #
+    global mcsweep = 1
     count = 0
     oldcount = 0
     outcount = 0
-    avg_sisj .= 0.0
-    avge = 0.0
-    avgesq = 0.0
+    global avg_sisj = zeros(nsize, nsize)
+    # global avg_sisj .= 0.0
+    global avge = 0.0
+    global avgesq = 0.0
     magnetization = 0.0
     sqaf = 0.0
-    average_s = 0.0
-    average_ssq = 0.0
+    global average_s = 0.0
+    global average_ssq = 0.0
     chai = 0.0
-    imc = 0
-    ifail = 0
-    ipass = 0
+    global imc = 0
+    global ifail = 0
+    global ipass = 0
     # CALL CPU_TIME(TIME1) #TIME1 = X05BAF()
     # MC_LOOP
-    while mcsweep <= maxmcsweep
+    @time while mcsweep <= maxmcsweep
         #
         # SWEEP_I1, SWEEP_I2
         for i1 = 1:lsize, i2 = 1:lsize
@@ -356,31 +374,42 @@ while temperature > 0.0         # temperature_loop
             current_s = tmp_spin
             
             energy_difference += -magnetic_field * current_s + magnetic_field * previous_s
+
             
-            if energy_difference < 0.0
+            # if energy_difference < 0.0
+            #     spins_lattice[i1, i2] = tmp_spin # update the temp spin
+            #     final_energy = previous_energy + energy_difference
+            #     ipass = ipass + 1
+            # else
+            #     metro_police = rand()
+            #     compare = energy_difference
+            #     compare = compare / (temperature + 1.0e-10)
+            #     compare = exp(-compare)
+                
+            #     if metro_police < compare
+            #         spins_lattice[i1, i2] = tmp_spin # update the temp spin
+            #         final_energy = previous_energy + energy_difference
+            #         ipass += 1
+            #     else
+            #         final_energy = previous_energy
+            #         ifail += 1
+            #     end
+            # end
+            
+            flag = metro_polis(energy_difference, temperature)
+            if flag
+                ipass += 1
                 spins_lattice[i1, i2] = tmp_spin # update the temp spin
                 final_energy = previous_energy + energy_difference
-                ipass = ipass + 1
             else
-                metro_police = rand()
-                compare = energy_difference
-                compare = compare / (temperature + 1.0e-10)
-                compare = exp(-compare)
-                
-                if metro_police < compare
-                    spins_lattice[i1, i2] = tmp_spin # update the temp spin
-                    final_energy = previous_energy + energy_difference
-                    ipass += 1
-                else
-                    final_energy = previous_energy
-                    ifail += 1
-                end
+                ifail += 1
+                final_energy = previous_energy
             end
-                
+            
             imc += 1
         end                     # sweep_i1, sweep_i2
         
-    
+        #
         if mcsweep > nequil
             count += 1
             # taking_avg
@@ -404,7 +433,7 @@ while temperature > 0.0         # temperature_loop
             end # taking_avg
         end
         mcsweep += 1
-    end                         # mc_loop
+    end                         # end mc_loop while
     
     divide = outcount * 1.0
     avg_sisj .= avg_sisj / divide
