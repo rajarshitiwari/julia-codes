@@ -10,7 +10,7 @@ function metro_polis(de, temp)::Bool
     flag = false
     if de < 0.0
         flag = true
-                else
+    else
         metro_police = rand()
         compare = exp(-de/(temp + 1.0e-10))
         if metro_police < compare
@@ -82,19 +82,19 @@ function total_energy_ising_2d(spins_lattice::Array{Int64}, jey1::Float64, jey2:
     return total_energy_ising_2d
 end # function total_energy_ising_2d
 
-function calculate_average_sssq(spins)
+function calculate_average_sssq(spins::Array{Int})
     # INTEGER, DIMENSION(:,:), INTENT(IN) :: SPINS
     # REAL(8), INTENT(OUT) :: TOTAL_S,TOTAL_SSQ
 
-    total_s = sum(spins[:, :])
-    total_ssq = total_s * total_s
+    total_s::Float64 = sum(spins[:, :])
+    total_ssq::Float64 = total_s * total_s
     return [total_s, total_ssq]
 end # end subroutine calculate_average_sssq
 
-function create_indices(lsize)
+function create_indices(lsize::Int)
     # INTEGER, INTENT(IN) :: LSIZE
 
-    indices = zeros(Int64, (lsize,lsize))
+    indices = zeros(Int, (lsize, lsize))
     for i1 = 1:lsize, i2 = 1:lsize
         indices[i1, i2] = lsize * (i1 - 1) + i2
     end
@@ -104,13 +104,7 @@ end # END SUBROUTINE CREATE_INDICES
 
 function generate_random_spin()
     # INTEGER, INTENT(OUT) :: SPINCONF
-    temp = rand()
-    if temp >= 0.50
-        spinconf = 1
-    else
-        spinconf = -1
-    end
-    return spinconf
+    return rand() >= 0.50 ? 1 : -1
 end # SUBROUTINE GENERATE_RANDOM_SPIN
 
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ###
@@ -119,15 +113,15 @@ function calculate_si_sj(spins::Array{Int})::Array{Float64}
     # INTEGER, DIMENSION(:,:), INTENT(IN) :: SPINS
     # INTEGER, DIMENSION(:,:), INTENT(OUT) :: SI_SJ
 
-    lsize = size(spins, 1)
-    nsize = lsize * lsize
+    lsize::Int = size(spins, 1)
+    nsize::Int = lsize * lsize
     si_sj = zeros((nsize, nsize))
 
     #ALL THE SITES HAVE NON ZERO SPINS
     for i1 = 1:lsize, i2 = 1:lsize
-        ii = indices[i1, i2]
+        ii::Int = indices[i1, i2]
         for j1 = 1:lsize, j2 = 1:lsize
-            jj = indices[j1, j2]
+            jj::Int = indices[j1, j2]
             #if ii < jj
             #    continue
             #end
@@ -144,8 +138,8 @@ function selected_sq_from_si_sj(si_sj::Array{Float64}, que::Vector{Int}, lsize::
     # INTEGER, INTENT(IN) :: LSIZE
     # REAL(8), INTENT(OUT) :: STRUCTURE_FACTOR
 
-    nsize = lsize * lsize
-    coeff = 2.0 * PI/ lsize
+    nsize::Int = lsize * lsize
+    coeff::Float64 = 2.0 * PI/ lsize
     normalize = nsize^2
 
     tmpdp = 0.0
@@ -245,7 +239,6 @@ global spins_lattice = zeros(Int, (lsize, lsize))
 #   ALLOCATE(MINUSPLUS(LSIZE,2),ONETON(LSIZE))
 
 global indices = create_indices(lsize)
-
 global minusplus = [circshift(Vector(1:lsize), 1) circshift(Vector(1:lsize), -1)]
 
 #   OPEN(UNIT_TMP, FILE = 'ising_2d.inp')
