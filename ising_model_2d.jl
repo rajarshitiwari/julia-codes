@@ -25,7 +25,7 @@ end
 function get_energy_diff(spins_lattice::Array{Int64, 2}, tmp_spin::Int64,
                          jey1::Float64, jey2::Float64, magnetic_field::Float64,
                          minusplus::Array{Int64}, xi::Array{Int64})
-    energy_difference = 0.0
+    energy_difference = zero(Float64)
     # xi = [i1,i2]
     i1, i2 = xi
     # nearest neighbor part
@@ -56,23 +56,23 @@ function total_energy_ising_2d(spins_lattice::Array{Int64, 2}, jey1::Float64, je
     xi = zeros(Int64, 2)
     
     lsize = size(spins_lattice)[1]
-    total_energy_ising_2d = 0.0
-    energy_nn = 0
-    energy_nnn = 0
+    total_energy_ising_2d = zero(jey1)
+    energy_nn = zero(Int64)
+    energy_nnn = zero(Int64)
     for i1 = 1:lsize, i2 = 1:lsize
 
         xi .= [i1, i2]    #NEAREST NEIGHBOR PART
         for m1 = 1:2, m2 = 1:1
             co .= xi
             co[m1] = minusplus[xi[m1], m2]
-            energy_nn = energy_nn + spins_lattice[i1, i2] * spins_lattice[co[1], co[2]]
+            energy_nn += spins_lattice[i1, i2] * spins_lattice[co[1], co[2]]
         end
 
         #NEXT NEAREST NEIGHBOR PART
         for m1 = 1:2, m2 = 1:1
             co[1] = minusplus[i1, m1]
             co[2] = minusplus[i2, m2]
-            energy_nnn = energy_nnn + spins_lattice[i1, i2] * spins_lattice[co[1], co[2]]
+            energy_nnn += spins_lattice[i1, i2] * spins_lattice[co[1], co[2]]
         end
     end
 
@@ -102,10 +102,8 @@ function create_indices(lsize::Int64)
 end # END SUBROUTINE CREATE_INDICES
 
 
-function generate_random_spin()
-    # INTEGER, INTENT(OUT) :: SPINCONF
-    return rand() >= 0.50 ? 1 : -1
-end # SUBROUTINE GENERATE_RANDOM_SPIN
+generate_random_spin() = rand() >= 0.5 ? 1 : -1
+# SUBROUTINE GENERATE_RANDOM_SPIN
 
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ###
 ### TAKE THE SPIN CONFIGURATION AND CALCULATE SI.SJ      ###
@@ -113,9 +111,9 @@ function calculate_si_sj(spins::Array{Int64, 2})::Array{Float64, 2}
     # INTEGER, DIMENSION(:,:), INTENT(IN) :: SPINS
     # INTEGER, DIMENSION(:,:), INTENT(OUT) :: SI_SJ
 
-    lsize::Int64 = size(spins, 1)
-    nsize::Int64 = lsize * lsize
-    si_sj = zeros((nsize, nsize))
+    lsize = size(spins, 1)
+    nsize = lsize * lsize
+    si_sj = zeros(Float64, (nsize, nsize))
 
     #ALL THE SITES HAVE NON ZERO SPINS
     for i1 = 1:lsize, i2 = 1:lsize
