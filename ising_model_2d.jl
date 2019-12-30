@@ -22,9 +22,9 @@ function metro_polis(de, temp)::Bool
     return flag
 end
 
-function get_energy_diff(spins_lattice::Array{Int}, tmp_spin::Int,
+function get_energy_diff(spins_lattice::Array{Int64, 2}, tmp_spin::Int64,
                          jey1::Float64, jey2::Float64, magnetic_field::Float64,
-                         minusplus::Array{Int}, xi::Array{Int})
+                         minusplus::Array{Int64}, xi::Array{Int64})
     energy_difference = 0.0
     # xi = [i1,i2]
     i1, i2 = xi
@@ -47,13 +47,13 @@ function get_energy_diff(spins_lattice::Array{Int}, tmp_spin::Int,
     return energy_difference
 end
 
-function total_energy_ising_2d(spins_lattice::Array{Int64}, jey1::Float64, jey2::Float64, magnetic_field::Float64)::Float64
+function total_energy_ising_2d(spins_lattice::Array{Int64, 2}, jey1::Float64, jey2::Float64, magnetic_field::Float64)::Float64
     # INTEGER, DIMENSION(:,:), INTENT(IN) :: SPINS_LATTICE
     # REAL(8), INTENT(IN) :: JEY1,JEY2
     # REAL(8), INTENT(IN) :: MAGNETIC_FIELD
 
-    co = zeros(Int, 2)
-    xi = zeros(Int, 2)
+    co = zeros(Int64, 2)
+    xi = zeros(Int64, 2)
     
     lsize = size(spins_lattice)[1]
     total_energy_ising_2d = 0.0
@@ -82,7 +82,7 @@ function total_energy_ising_2d(spins_lattice::Array{Int64}, jey1::Float64, jey2:
     return total_energy_ising_2d
 end # function total_energy_ising_2d
 
-function calculate_average_sssq(spins::Array{Int})
+function calculate_average_sssq(spins::Array{Int64, 2})
     # INTEGER, DIMENSION(:,:), INTENT(IN) :: SPINS
     # REAL(8), INTENT(OUT) :: TOTAL_S,TOTAL_SSQ
 
@@ -91,10 +91,10 @@ function calculate_average_sssq(spins::Array{Int})
     return [total_s, total_ssq]
 end # end subroutine calculate_average_sssq
 
-function create_indices(lsize::Int)
+function create_indices(lsize::Int64)
     # INTEGER, INTENT(IN) :: LSIZE
 
-    indices = zeros(Int, (lsize, lsize))
+    indices = zeros(Int64, (lsize, lsize))
     for i1 = 1:lsize, i2 = 1:lsize
         indices[i1, i2] = lsize * (i1 - 1) + i2
     end
@@ -109,19 +109,19 @@ end # SUBROUTINE GENERATE_RANDOM_SPIN
 
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ###
 ### TAKE THE SPIN CONFIGURATION AND CALCULATE SI.SJ      ###
-function calculate_si_sj(spins::Array{Int})::Array{Float64}
+function calculate_si_sj(spins::Array{Int64, 2})::Array{Float64, 2}
     # INTEGER, DIMENSION(:,:), INTENT(IN) :: SPINS
     # INTEGER, DIMENSION(:,:), INTENT(OUT) :: SI_SJ
 
-    lsize::Int = size(spins, 1)
-    nsize::Int = lsize * lsize
+    lsize::Int64 = size(spins, 1)
+    nsize::Int64 = lsize * lsize
     si_sj = zeros((nsize, nsize))
 
     #ALL THE SITES HAVE NON ZERO SPINS
     for i1 = 1:lsize, i2 = 1:lsize
-        ii::Int = indices[i1, i2]
+        ii::Int64 = indices[i1, i2]
         for j1 = 1:lsize, j2 = 1:lsize
-            jj::Int = indices[j1, j2]
+            jj::Int64 = indices[j1, j2]
             #if ii < jj
             #    continue
             #end
@@ -132,13 +132,13 @@ function calculate_si_sj(spins::Array{Int})::Array{Float64}
     return si_sj
 end # SUBROUTINE CALCULATE_SI_SJ
 
-function selected_sq_from_si_sj(si_sj::Array{Float64}, que::Vector{Int}, lsize::Int)::Float64
+function selected_sq_from_si_sj(si_sj::Array{Float64}, que::Vector{Int64}, lsize::Int64)::Float64
     # INTEGER, DIMENSION(:,:), INTENT(IN) :: SI_SJ
     # INTEGER, DIMENSION(:), INTENT(IN) :: QUE
     # INTEGER, INTENT(IN) :: LSIZE
     # REAL(8), INTENT(OUT) :: STRUCTURE_FACTOR
 
-    nsize::Int = lsize * lsize
+    nsize::Int64 = lsize * lsize
     coeff::Float64 = 2.0 * PI/ lsize
     normalize = nsize^2
 
@@ -150,7 +150,7 @@ function selected_sq_from_si_sj(si_sj::Array{Float64}, que::Vector{Int}, lsize::
         
     structure_factor = tmpdp
 
-    rij = zeros(Int, 2)
+    rij = zeros(Int64, 2)
     q = que
     for i1 = 1:lsize, j1 = 1:lsize
         rij[1] = i1 - j1
@@ -173,12 +173,12 @@ end # SUBROUTINE SELECTED_SQ_FROM_SI_SJ
 ### %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ###
 ### GIVEN SI.SJ FOR THE SPIN CONFIGURATION, CALCULATE    ###
 ### THE STRUCTURE FACTOR S(Q) FROM THIS                  ###
-function structure_factor_from_si_sj(si_sj::Array{Float64}, lsize::Int)::Array{Float64}
+function structure_factor_from_si_sj(si_sj::Array{Float64}, lsize::Int64)::Array{Float64, 2}
     # INTEGER, DIMENSION(:,:), INTENT(IN) :: SI_SJ
     # REAL(8), DIMENSION(:,:), INTENT(OUT) :: STRUCTURE_FACTOR
 
     structure_factor = zeros(lsize, lsize)
-    que = zeros(Int, 2)
+    que = zeros(Int64, 2)
     
     # LOOP Q1
     for q1 = 1:lsize
@@ -233,7 +233,7 @@ global delta_t = max_temperature / (number_of_temperature - 1)
 si_sj = zeros(nsize, nsize)
 global sf_ising = zeros(lsize, lsize) #   ALLOCATE(SF_ISING(0:LSIZE-1,0:LSIZE-1))
 
-global spins_lattice = zeros(Int, (lsize, lsize))
+global spins_lattice = zeros(Int64, (lsize, lsize))
 
 
 #   ALLOCATE(MINUSPLUS(LSIZE,2),ONETON(LSIZE))
@@ -337,7 +337,7 @@ while temperature::Float64 > 0.0         # temperature_loop
             ########################################
             # CALCULATE THE ENERGY DIFFERENCE NOW  #
             ########################################
-            energy_difference = get_energy_diff(spins_lattice, tmp_spin, jey1, jey2, magnetic_field, minusplus, Vector{Int}([i1, i2]))
+            energy_difference = get_energy_diff(spins_lattice, tmp_spin, jey1, jey2, magnetic_field, minusplus, Vector{Int64}([i1, i2]))
             #
             flag = metro_polis(energy_difference, temperature)
             if flag
@@ -471,7 +471,7 @@ end # do temperature_loop
 
 
 # energy_difference = 0.0
-# xi = Vector{Int}([i1, i2]) #nearest neighbor part
+# xi = Vector{Int64}([i1, i2]) #nearest neighbor part
 # for m1 = 1:2, m2 = 1:2
 #     co = xi
 #     co[m1] = minusplus[xi[m1], m2]
