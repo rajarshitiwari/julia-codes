@@ -239,17 +239,17 @@ function main(jey1::Float64, jey2::Float64, magnetic_field::Float64, maxmcsweep:
     
     #   CLOSE(UNIT_TMP)
     
-    #   WRITE(*,'("JEY1            = ",F15.5)')JEY1
-    #   WRITE(*,'("JEY2            = ",F15.5)')JEY2
-    #   WRITE(*,'("LSIZE           = ",I15)')LSIZE
-    #   WRITE(*,'("NSIZE           = ",I15)')NSIZE
-    #   WRITE(*,'("SWEEP LENGTH    = ",I15)')MAXMCSWEEP
-    #   WRITE(*,'("EQUIL LENGTH    = ",I15)')NEQUIL
-    #   WRITE(*,'("NO. OF T        = ",I15)')NUMBER_OF_TEMPERATURE
-    #   WRITE(*,'("MAXIMUM T       = ",F15.5)')MAX_TEMPERATURE
-    #   WRITE(*,'("DELTA T         = ",F15.5)')DELTA_T
-    #   WRITE(*,'("MAGNETIC FIELD  = ",3(F15.5,1X))')MAGNETIC_FIELD
-
+    println("JEY1            = ", jey1)
+    println("JEY2            = ", jey2)
+    println("LSIZE           = ", lsize)
+    println("NSIZE           = ", nsize)
+    println("SWEEP LENGTH    = ", maxmcsweep)
+    println("EQUIL LENGTH    = ", nequil)
+    println("NO. OF T        = ", number_of_temperature)
+    println("MAXIMUM T       = ", Temperatures[1])
+    println("DELTA T         = ", Temperatures[2] - Temperatures[1])
+    println("MAGNETIC FIELD  = ", magnetic_field)
+    
     #GENERATE THE SNAPSHOT OF SPINS (RANDOM CONFIGURATION)#
 
     for i1 = 1:lsize, i2 = 1:lsize
@@ -290,7 +290,6 @@ function main(jey1::Float64, jey2::Float64, magnetic_field::Float64, maxmcsweep:
     previous_energy = total_energy
     
     # temperature = max_temperature
-    println(Temperatures[1])
     count_temp = 0
     
     for temperature in Temperatures # temperature_loop
@@ -312,8 +311,9 @@ function main(jey1::Float64, jey2::Float64, magnetic_field::Float64, maxmcsweep:
         global ifail = 0
         global ipass = 0
         # CALL CPU_TIME(TIME1) #TIME1 = X05BAF()
+        time1 = time()
         # MC_LOOP
-        @time while mcsweep <= maxmcsweep
+        for mcsweep = 1:maxmcsweep
             #
             # SWEEP_I1, SWEEP_I2
             for i1 = 1:lsize, i2 = 1:lsize
@@ -347,18 +347,17 @@ function main(jey1::Float64, jey2::Float64, magnetic_field::Float64, maxmcsweep:
                     # total_s = sum(spins_lattice(:,:))
                     # s_square = total_s**2
                     #
-                    total_energy = total_energy_ising_2d(spins_lattice, jey1, jey2, magnetic_field)
-                    #
                     average_s += total_s
                     average_ssq += s_square
                     avg_sisj .+= si_sj
-                    avgesq += total_energy^2
+                    total_energy = total_energy_ising_2d(spins_lattice, jey1, jey2, magnetic_field)
                     avge += total_energy
+                    avgesq += total_energy^2
                     #
                     oldcount = count
                 end # taking_avg
             end
-            mcsweep += 1
+            # mcsweep += 1
         end                         # end mc_loop while
         
         divide = outcount * 1.0
@@ -371,16 +370,16 @@ function main(jey1::Float64, jey2::Float64, magnetic_field::Float64, maxmcsweep:
         
         # ###########################################################
         # ###########################################################
-        # call cpu_time(time2) #time2 = x05baf()#
+        time2 = time()          # call cpu_time(time2)
         # write(*,"(a,2x,f15.10)",advance='no')'running program at t =',temperature
         # write(*,'(3x,"time taken =",f12.2," seconds")',advance='no')(time2-time1)
         
-        # call cpu_time(tsf1)        #tsf1 = x05baf()
-        @time sf_ising = structure_factor_from_si_sj(avg_sisj, indices)
-        # call cpu_time(tsf2)        #tsf2 = x05baf()
+        tsf1 = time()    # call cpu_time(tsf1)
+        sf_ising = structure_factor_from_si_sj(avg_sisj, indices)
+        tsf2 = time()    # call cpu_time(tsf2)
         max_sq = maximum(sf_ising)
         # write(*,'(3x,"time for s(q) =",1x,f12.2,1x,"seconds. maximum s(q) =",1x,f20.10)')tsf2-tsf1,max_sq
-        println("count = ", count_temp, " Temperature = ", temperature)
+        println("count = ", count_temp, " Temperature = ", temperature, " Time in mcloop = ", time2 - time1, " Time in S(Q) = ", tsf2 - tsf1)
         c_v = (avgesq - (avge)^2) / nsize
         c_v = c_v / (temperature^2)
         avge = avge / nsize
