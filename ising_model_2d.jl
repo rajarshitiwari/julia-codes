@@ -48,6 +48,32 @@ function get_energy_diff(spins_lattice::Array{Int64, 2}, tmp_spin::Int64,
     return energy_difference
 end
 
+
+function mc_sweep!(spins_lattice::Array{Int64, 2}, jey1::Float64, jey2::Float64, magnetic_field::Float64,
+                   temperature::Float64, minusplus::Array{Int64, 2}, ipass::Int64, ifail::Int64, imc::Int64)
+    lsize = size(spins_lattice, 1)
+    ediff = zero(jey1)
+    # SWEEP_I1, SWEEP_I2
+    for i1 = 1:lsize, i2 = 1:lsize
+        tmp_spin = - spins_lattice[i1, i2] # FLIP THE TEMP SPIN
+        ########################################
+        # CALCULATE THE ENERGY DIFFERENCE NOW  #
+        ########################################
+        energy_difference = get_energy_diff(spins_lattice, tmp_spin, jey1, jey2, magnetic_field, minusplus, Vector{Int64}([i1, i2]))
+        #
+        flag = metro_polis(energy_difference, temperature)
+        if flag
+            ipass += 1
+            spins_lattice[i1, i2] = tmp_spin # update the temp spin
+        else
+            ifail += 1
+        end
+        imc += 1
+        ediff += energy_difference
+    end                     # sweep_i1, sweep_i2
+    return ediff
+end
+
 function total_energy_ising_2d(spins_lattice::Array{Int64, 2}, jey1::Float64, jey2::Float64, magnetic_field::Float64)::Float64
     # INTEGER, DIMENSION(:,:), INTENT(IN) :: SPINS_LATTICE
     # REAL(8), INTENT(IN) :: JEY1,JEY2
@@ -296,67 +322,64 @@ function main(jey1::Float64, jey2::Float64, magnetic_field::Float64, maxmcsweep:
     for temperature in Temperatures # temperature_loop
         #
         global mcsweep = 1
-        count = 0
-        oldcount = 0
         outcount = 0
         global avg_sisj = zeros(nsize, nsize)
         # global avg_sisj .= 0.0
         global avge = 0.0
         global avgesq = 0.0
-        magnetization = 0.0
-        sqaf = 0.0
         global average_s = 0.0
         global average_ssq = 0.0
-        chai = 0.0
         global imc = 0
         global ifail = 0
         global ipass = 0
-        # CALL CPU_TIME(TIME1) #TIME1 = X05BAF()
-        time1 = time()
+        # global chai = 0.0
+        # global magnetization = 0.0
+        # global sqaf = 0.0
+        time1 = time()          # call cpu_time(time1)
         # MC_LOOP
         for mcsweep = 1:maxmcsweep
             #
-            # SWEEP_I1, SWEEP_I2
-            for i1 = 1:lsize, i2 = 1:lsize
-                tmp_spin = - spins_lattice[i1, i2] # FLIP THE TEMP SPIN
-                ########################################
-                # CALCULATE THE ENERGY DIFFERENCE NOW  #
-                ########################################
-                energy_difference = get_energy_diff(spins_lattice, tmp_spin, jey1, jey2, magnetic_field, minusplus, Vector{Int64}([i1, i2]))
-                #
-                flag = metro_polis(energy_difference, temperature)
-                if flag
-                    ipass += 1
-                    spins_lattice[i1, i2] = tmp_spin # update the temp spin
-                    final_energy = previous_energy + energy_difference
-                else
-                    ifail += 1
-                    final_energy = previous_energy
-                end
-                imc += 1
-            end                     # sweep_i1, sweep_i2
+
+            energy_difference = mc_sweep!(spins_lattice, jey1, jey2, magnetic_field, temperature, minusplus, ipass, ifail, imc)
+            println(imc, ipass, ifail)
+            # # SWEEP_I1, SWEEP_I2
+            # for i1 = 1:lsize, i2 = 1:lsize
+            #     tmp_spin = - spins_lattice[i1, i2] # FLIP THE TEMP SPIN
+            #     ########################################
+            #     # CALCULATE THE ENERGY DIFFERENCE NOW  #
+            #     ########################################
+            #     energy_difference = get_energy_diff(spins_lattice, tmp_spin, jey1, jey2, magnetic_field, minusplus, Vector{Int64}([i1, i2]))
+            #     #
+            #     flag = metro_polis(energy_difference, temperature)
+            #     if flag
+            #         ipass += 1
+            #         spins_lattice[i1, i2] = tmp_spin # update the temp spin
+            #         final_energy = previous_energy + energy_difference
+            #     else
+            #         ifail += 1
+            #         final_energy = previous_energy
+            #     end
+            #     imc += 1
+            # end                     # sweep_i1, sweep_i2
             
             #
-            if mcsweep > nequil
-                count += 1
+            if mcsweep > nequil && mcsweep % ndel == 0
                 # taking_avg
-                if count - oldcount == ndel
-                    outcount += 1
-                    
-                    si_sj .= calculate_si_sj(spins_lattice, indices)
-                    total_s, s_square = calculate_average_sssq(spins_lattice)
-                    # total_s = sum(spins_lattice(:,:))
-                    # s_square = total_s**2
-                    #
-                    average_s += total_s
-                    average_ssq += s_square
-                    avg_sisj .+= si_sj
-                    total_energy = total_energy_ising_2d(spins_lattice, jey1, jey2, magnetic_field)
-                    avge += total_energy
-                    avgesq += total_energy^2
-                    #
-                    oldcount = count
-                end # taking_avg
+                outcount += 1
+                
+                si_sj .= calculate_si_sj(spins_lattice, indices)
+                total_s, s_square = calculate_average_sssq(spins_lattice)
+                # total_s = sum(spins_lattice(:,:))
+                # s_square = total_s**2
+                #
+                average_s += total_s
+                average_ssq += s_square
+                avg_sisj .+= si_sj
+                total_energy = total_energy_ising_2d(spins_lattice, jey1, jey2, magnetic_field)
+                avge += total_energy
+                avgesq += total_energy^2
+                #
+                # taking_avg
             end
             # mcsweep += 1
         end                         # end mc_loop while
