@@ -1,5 +1,6 @@
 #!/usr/bin/env julia
 
+using Printf
 using LinearAlgebra
 const PI = 4.0*atan(1.0)
 # Int :: indices(:,:)
@@ -369,7 +370,6 @@ function main(jey1::Float64, jey2::Float64, magnetic_field::Float64, maxmcsweep:
         # write(unit_acc,'(3(f15.10,1x))')temperature,dble(ipass)/dble(imc),dble(ifail)/dble(imc)
         
         # ###########################################################
-        # ###########################################################
         time2 = time()          # call cpu_time(time2)
         # write(*,"(a,2x,f15.10)",advance='no')'running program at t =',temperature
         # write(*,'(3x,"time taken =",f12.2," seconds")',advance='no')(time2-time1)
@@ -379,7 +379,7 @@ function main(jey1::Float64, jey2::Float64, magnetic_field::Float64, maxmcsweep:
         tsf2 = time()    # call cpu_time(tsf2)
         max_sq = maximum(sf_ising)
         # write(*,'(3x,"time for s(q) =",1x,f12.2,1x,"seconds. maximum s(q) =",1x,f20.10)')tsf2-tsf1,max_sq
-        println("count = ", count_temp, " Temperature = ", temperature, " Time in mcloop = ", time2 - time1, " Time in S(Q) = ", tsf2 - tsf1)
+        @printf("count = %2d, Temperature = %f, Time in mcloop = %10.3f, Time in S(Q) = %10.3f, max_sq = %f\n", count_temp, temperature, time2 - time1, tsf2 - tsf1, max_sq)
         c_v = (avgesq - (avge)^2) / nsize
         c_v = c_v / (temperature^2)
         avge = avge / nsize
