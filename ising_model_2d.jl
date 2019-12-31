@@ -71,7 +71,7 @@ function mc_sweep!(spins_lattice::Array{Int64, 2}, jey1::Float64, jey2::Float64,
         imc += 1
         ediff += energy_difference
     end                     # sweep_i1, sweep_i2
-    return ediff
+    return [ediff, ipass, ifail, imc]
 end
 
 function total_energy_ising_2d(spins_lattice::Array{Int64, 2}, jey1::Float64, jey2::Float64, magnetic_field::Float64)::Float64
@@ -165,10 +165,10 @@ function selected_sq_from_si_sj(si_sj::Array{Float64}, que::Vector{Int64}, indic
 
     lsize = size(indices, 1)
     nsize::Int64 = lsize * lsize
-    coeff::Float64 = 2.0 * PI/ lsize
+    coeff::Float64 = 2.0 * PI / lsize
     normalize = nsize^2
 
-    tmpdp = 0.0
+    tmpdp = zero(Float64)
     for i = 1:nsize
         tmpdp += si_sj[i, i]
     end
@@ -178,6 +178,19 @@ function selected_sq_from_si_sj(si_sj::Array{Float64}, que::Vector{Int64}, indic
 
     rij = zeros(Int64, 2)
     q = que
+
+    # for i1 = 1:lsize, j1 = 1:lsize
+    #     rij[1] = i1 - j1
+    #     for i2 = 1:lsize, j2 = 1:lsize
+    #         rij[2] = i2 - j2
+    #         ii, jj = indices[i1, i2], indices[j1, j2]
+    #         if jj >= ii
+    #             continue
+    #         end
+    #         structure_factor += si_sj[ii, jj] * 2.0 * cos(coeff * dot(q, rij))
+    #     end
+    # end
+
     for i1 = 1:lsize, j1 = 1:lsize
         rij[1] = i1 - j1
         for i2 = 1:lsize, j2 = 1:lsize
@@ -192,6 +205,7 @@ function selected_sq_from_si_sj(si_sj::Array{Float64}, que::Vector{Int64}, indic
             structure_factor += tmpdp
         end
     end
+    
     structure_factor = structure_factor / normalize
     return structure_factor
 end # SUBROUTINE SELECTED_SQ_FROM_SI_SJ
@@ -211,7 +225,7 @@ function structure_factor_from_si_sj(si_sj::Array{Float64}, indices::Array{Int64
         for q2 = 1:lsize
             que[2] = q2 - 1
             #
-            structure_factor[q1, q2] = selected_sq_from_si_sj(si_sj, que, indices::Array{Int64, 2})
+            structure_factor[q1, q2] = selected_sq_from_si_sj(si_sj, que, indices)
             #
         end # DO LOOP_Q2
     end # DO LOOP_Q1
@@ -221,15 +235,6 @@ function structure_factor_from_si_sj(si_sj::Array{Float64}, indices::Array{Int64
 end # SUBROUTINE STRUCTURE_FACTOR_FROM_SI_SJ
 
 # PROGRAM COOL_ISING_SPINS_3D
-
-#   USE MYTYPE
-
-#   IMPLICIT NONE
-
-const lsize = 20
-const nsize = lsize * lsize
-
-
 function main(jey1::Float64, jey2::Float64, magnetic_field::Float64, maxmcsweep::Int64, nequil::Int64, ndel::Int64, Temperatures::Vector{Float64})
     
     #   UNIT_ES   = 100
@@ -279,10 +284,12 @@ function main(jey1::Float64, jey2::Float64, magnetic_field::Float64, maxmcsweep:
     
     #GENERATE THE SNAPSHOT OF SPINS (RANDOM CONFIGURATION)#
 
-    for i1 = 1:lsize, i2 = 1:lsize
-        #SPINS_LATTICE(I1,I2) = 1
-        spins_lattice[i1, i2] = generate_random_spin()
-    end
+    #for i1 = 1:lsize, i2 = 1:lsize
+    #    #SPINS_LATTICE(I1,I2) = 1
+    #    spins_lattice[i1, i2] = generate_random_spin()
+    #end
+    spins_lattice .= [generate_random_spin() for i1 = 1:lsize, i2 = 1:lsize]
+
     unit_tmp = open("starting_spins.dat", "w")
     for i1 = 1:lsize
         for i2 = 1:lsize
@@ -329,9 +336,9 @@ function main(jey1::Float64, jey2::Float64, magnetic_field::Float64, maxmcsweep:
         global avgesq = 0.0
         global average_s = 0.0
         global average_ssq = 0.0
-        global imc = 0
-        global ifail = 0
-        global ipass = 0
+        imc::Int64 = 0
+        ifail::Int64 = 0
+        ipass::Int64 = 0
         # global chai = 0.0
         # global magnetization = 0.0
         # global sqaf = 0.0
@@ -340,27 +347,28 @@ function main(jey1::Float64, jey2::Float64, magnetic_field::Float64, maxmcsweep:
         for mcsweep = 1:maxmcsweep
             #
 
-            energy_difference = mc_sweep!(spins_lattice, jey1, jey2, magnetic_field, temperature, minusplus, ipass, ifail, imc)
-            println(imc, ipass, ifail)
-            # # SWEEP_I1, SWEEP_I2
-            # for i1 = 1:lsize, i2 = 1:lsize
-            #     tmp_spin = - spins_lattice[i1, i2] # FLIP THE TEMP SPIN
-            #     ########################################
-            #     # CALCULATE THE ENERGY DIFFERENCE NOW  #
-            #     ########################################
-            #     energy_difference = get_energy_diff(spins_lattice, tmp_spin, jey1, jey2, magnetic_field, minusplus, Vector{Int64}([i1, i2]))
-            #     #
-            #     flag = metro_polis(energy_difference, temperature)
-            #     if flag
-            #         ipass += 1
-            #         spins_lattice[i1, i2] = tmp_spin # update the temp spin
-            #         final_energy = previous_energy + energy_difference
-            #     else
-            #         ifail += 1
-            #         final_energy = previous_energy
-            #     end
-            #     imc += 1
-            # end                     # sweep_i1, sweep_i2
+            # energy_difference, ipass, ifail, imc = mc_sweep!(spins_lattice, jey1, jey2, magnetic_field, temperature, minusplus, ipass, ifail, imc)
+            # @printf("imc = %d, ipass = %d, ifail = %d: %d\n", imc, ipass, ifail, ipass + ifail)
+
+            # SWEEP_I1, SWEEP_I2
+            for i1 = 1:lsize, i2 = 1:lsize
+                tmp_spin = - spins_lattice[i1, i2] # FLIP THE TEMP SPIN
+                ########################################
+                # CALCULATE THE ENERGY DIFFERENCE NOW  #
+                ########################################
+                energy_difference = get_energy_diff(spins_lattice, tmp_spin, jey1, jey2, magnetic_field, minusplus, Vector{Int64}([i1, i2]))
+                #
+                flag = metro_polis(energy_difference, temperature)
+                if flag
+                    ipass += 1
+                    spins_lattice[i1, i2] = tmp_spin # update the temp spin
+                    final_energy = previous_energy + energy_difference
+                else
+                    ifail += 1
+                    final_energy = previous_energy
+                end
+                imc += 1
+            end                     # sweep_i1, sweep_i2
             
             #
             if mcsweep > nequil && mcsweep % ndel == 0
@@ -430,6 +438,9 @@ function main(jey1::Float64, jey2::Float64, magnetic_field::Float64, maxmcsweep:
 end                             # end main
 
 
+const lsize = 18
+const nsize = lsize * lsize
+
 #   #======READ THE INPUT VARIABLES FIRSTLY FROM ARGUMENT
 #   #IF THAT NOT GIVEN THEN FROM STANDARD INPUT=======#
 jey1 = -1.0
@@ -446,7 +457,7 @@ MaxTemperature = 3.0 * abs(jey1)
 MinTemperature = 0.0
 number_of_temperature = 60
 Temperatures = Vector(LinRange(MaxTemperature, MinTemperature, number_of_temperature))
-println(Temperatures)
+
 main(jey1, jey2, magnetic_field, maxmcsweep, nequil, ndel, Temperatures)
 
 # CLOSE(UNIT_ES)
@@ -474,39 +485,3 @@ main(jey1, jey2, magnetic_field, maxmcsweep, nequil, ndel, Temperatures)
 # CONTAINS
 # END PROGRAM COOL_ISING_SPINS_3D
 
-
-# if energy_difference < 0.0
-#     spins_lattice[i1, i2] = tmp_spin # update the temp spin
-#     final_energy = previous_energy + energy_difference
-#     ipass = ipass + 1
-# else
-#     metro_police = rand()
-#     compare = energy_difference
-#     compare = compare / (temperature + 1.0e-10)
-#     compare = exp(-compare)
-#     if metro_police < compare
-#         spins_lattice[i1, i2] = tmp_spin # update the temp spin
-#         final_energy = previous_energy + energy_difference
-#         ipass += 1
-#     else
-#         final_energy = previous_energy
-#         ifail += 1
-#     end
-# end
-
-
-# energy_difference = 0.0
-# xi = Vector{Int64}([i1, i2]) #nearest neighbor part
-# for m1 = 1:2, m2 = 1:2
-#     co = xi
-#     co[m1] = minusplus[xi[m1], m2]
-#     energy_difference += 2.0 * jey1 * tmp_spin * spins_lattice[co[1], co[2]]
-# end
-# # xi = [i1,i2]
-# for m1 = 1:2, m2 = 1:2
-#     co = [minusplus[i1, m1], minusplus[i2, m2]]
-#     energy_difference += 2.0 * jey2 * tmp_spin * spins_lattice[co[1], co[2]]
-# end
-# previous_s = spins_lattice[i1, i2]
-# current_s = tmp_spin
-# energy_difference += -magnetic_field * current_s + magnetic_field * previous_s
