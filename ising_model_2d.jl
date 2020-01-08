@@ -7,7 +7,7 @@ const PI = 4.0*atan(1.0)
 # Int :: minusplus(:,:)
 
 
-function metro_polis(de, temp)::Bool
+function metro_polis(de::Float64, temp::Float64)::Bool
     flag = false
     if de < 0.0
         flag = true
